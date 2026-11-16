@@ -12,7 +12,7 @@ import polars as pl
 from huggingface_hub import HfApi, create_repo, hf_hub_download, upload_folder
 
 from georeset_corpus_assessment import settings
-from georeset_corpus_assessment.engine import VllmEngine
+from georeset_corpus_assessment.engine import TransformersEngine
 from georeset_corpus_assessment.legend import load_legend
 from georeset_corpus_assessment.pipeline import (
     RunConfig,
@@ -163,7 +163,7 @@ def _run(args: argparse.Namespace) -> None:  # pragma: no cover
         seed=settings.SEED,
         gpu=args.gpu,
     )
-    engine = VllmEngine(
+    engine = TransformersEngine(
         settings.MODEL_ID,
         settings.MODEL_REVISION,
         settings.MAX_NEW_TOKENS,
