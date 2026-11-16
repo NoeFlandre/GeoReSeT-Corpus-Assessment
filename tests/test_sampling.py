@@ -52,3 +52,10 @@ def test_order_is_reproducible_for_a_seed() -> None:
     first = round_robin(make_pool(), seed=3)["id"].to_list()
     second = round_robin(make_pool(), seed=3)["id"].to_list()
     assert first == second
+
+
+def test_round_robin_keeps_the_other_columns() -> None:
+    pool = make_pool().with_columns(pl.col("id").str.to_uppercase().alias("text"))
+    order = round_robin(pool, seed=1)
+    assert "text" in order.columns
+    assert order.filter(pl.col("id") == "A0")["text"].to_list() == ["A0"]

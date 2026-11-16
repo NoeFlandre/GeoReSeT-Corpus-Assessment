@@ -28,9 +28,7 @@ def round_robin(pool: pl.DataFrame, seed: int) -> pl.DataFrame:
     (0-based, the rank of the row within its cell), ``position`` (index in the
     final order) and the helper keys.
     """
-    keyed = pool.select(
-        "id",
-        "cell",
+    keyed = pool.with_columns(
         pl.col("id")
         .map_elements(
             lambda value: stable_key(seed, value),
@@ -52,4 +50,5 @@ def round_robin(pool: pl.DataFrame, seed: int) -> pl.DataFrame:
         )
         .sort(["round", "cell_key", "cell", "row_key"])
         .with_row_index("position")
+        .drop("row_key", "cell_key")
     )
