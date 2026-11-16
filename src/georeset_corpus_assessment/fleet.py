@@ -1,9 +1,9 @@
 """Decide which worker jobs to submit or cancel, inside the caps and time windows.
 
-Caps: 24 jobs per site, 60 jobs in total, and no besteffort jobs. Every job of
-the account counts, running or waiting. A job waiting longer than 9 minutes
-is cancelled. Jobs never cross 09:00 or 19:00 on weekdays, so each job fits
-one daytime or one night window.
+Caps: 36 jobs per site and 100 in total, counting besteffort jobs. Every job of
+the account counts, running or waiting. A job waiting longer than 2 hours is
+cancelled, so queue position is kept. Jobs never cross 09:00 or 19:00 on
+weekdays, so each job fits one daytime or one night window.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 CAP_PER_SITE = 36
 CAP_TOTAL = 100
-WAIT_LIMIT = timedelta(minutes=9)
+WAIT_LIMIT = timedelta(hours=2)
 MAX_WALLTIME_MIN = 30
 MARGIN_MIN = 2
 LOAD_MIN = 4

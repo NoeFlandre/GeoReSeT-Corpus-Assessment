@@ -52,9 +52,9 @@ def test_parse_reads_each_job_and_its_submission_time() -> None:
     assert jobs[1].submitted == datetime(2026, 11, 16, 18, 0)  # noqa: DTZ001
 
 
-def test_plan_cancels_waiting_jobs_older_than_nine_minutes() -> None:
-    old = Job(1, "W", MONDAY_1800 - timedelta(minutes=10))
-    fresh = Job(2, "W", MONDAY_1800 - timedelta(minutes=2))
+def test_plan_cancels_waiting_jobs_older_than_two_hours() -> None:
+    old = Job(1, "W", MONDAY_1800 - timedelta(hours=3))
+    fresh = Job(2, "W", MONDAY_1800 - timedelta(minutes=30))
     running = Job(3, "R", MONDAY_1800 - timedelta(hours=1))
     result = plan({"lille": [old, fresh, running]}, MONDAY_1800, {}, Health())
     assert result.cancel == {"lille": [1]}
@@ -143,7 +143,7 @@ def test_apply_outcomes_records_successes_too() -> None:
 
 
 def test_long_state_names_from_full_oarstat_count_as_waiting() -> None:
-    old = Job(5, "Waiting", MONDAY_1800 - timedelta(minutes=20))
+    old = Job(5, "Waiting", MONDAY_1800 - timedelta(hours=3))
     result = plan({"lille": [old]}, MONDAY_1800, {}, Health())
     assert result.cancel == {"lille": [5]}
 
