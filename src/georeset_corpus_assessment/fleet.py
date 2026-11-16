@@ -23,7 +23,7 @@ MIN_USEFUL_MIN = 15
 DAY_START = 9
 DAY_END = 19
 STRIKES = 2
-WORKER_STATE_WAITING = "W"
+WAITING_STATES = frozenset({"W", "Waiting"})
 FIRST_WEEKEND_DAY = 5
 FIELD_PATTERN = re.compile(r"^(\w+) = (.*)$")
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -122,7 +122,7 @@ def _stale_waiting(jobs: list[Job], now: datetime) -> list[int]:
     return [
         job.job_id
         for job in jobs
-        if job.state == WORKER_STATE_WAITING
+        if job.state in WAITING_STATES
         and job.submitted is not None
         and now - job.submitted > WAIT_LIMIT
     ]

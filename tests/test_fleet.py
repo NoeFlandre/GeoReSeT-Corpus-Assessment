@@ -140,3 +140,9 @@ def test_apply_outcomes_records_successes_too() -> None:
     health = Health()
     apply_outcomes(health, "nantes", failures=0, successes=2, running=False)
     assert health.failures == {"nantes": 0}
+
+
+def test_long_state_names_from_full_oarstat_count_as_waiting() -> None:
+    old = Job(5, "Waiting", MONDAY_1800 - timedelta(minutes=20))
+    result = plan({"lille": [old]}, MONDAY_1800, {}, Health())
+    assert result.cancel == {"lille": [5]}
