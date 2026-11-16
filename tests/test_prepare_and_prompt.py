@@ -1,11 +1,15 @@
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 from georeset_corpus_assessment.legend import EunisClass, Legend
 from georeset_corpus_assessment.prepare import (
     build_pool,
+    compact_labels,
     legend_table_from_csv,
+    merge_pool_parts,
+    select_part,
     write_pool,
 )
 from georeset_corpus_assessment.prompt import (
@@ -82,3 +86,40 @@ def test_build_messages_puts_instructions_and_sentence_in_order(legend: Legend) 
     assert "Salt marsh at the estuary." in messages[1]["content"]
     assert "- MA211: Saltmarsh" in messages[1]["content"]
     assert PROMPT_VERSION == "zero-shot-v1"
+
+
+def test_select_part_deals_sorted_files_round_robin() -> None:
+
+    files = ["c.parquet", "a.parquet", "b.parquet", "d.parquet"]
+    assert select_part(files, 0, 2) == ["a.parquet", "c.parquet"]
+    assert select_part(files, 1, 2) == ["b.parquet", "d.parquet"]
+
+
+def test_select_part_rejects_an_out_of_range_part() -> None:
+
+    with pytest.raises(ValueError, match="part must satisfy"):
+        select_part(["a.parquet"], 2, 2)
+
+
+def test_merge_pool_parts_concatenates_rows() -> None:
+
+    merged = merge_pool_parts(
+        [pl.DataFrame({"id": ["a"]}), pl.DataFrame({"id": ["b"]})]
+    )
+    assert merged["id"].to_list() == ["a", "b"]
+
+
+def test_compact_labels_keeps_labelled_rows_and_needed_columns() -> None:
+
+    labels = pl.DataFrame(
+        {
+            "polygon_id": ["way/1", "way/2"],
+            "osm_tag": ["x", "y"],
+            "eunis_code": [[1101], None],
+            "eunis_shares": [[1.0], None],
+        },
+        schema_overrides={"eunis_code": pl.List(pl.Int64)},
+    )
+    compact = compact_labels(labels)
+    assert compact.columns == ["polygon_id", "eunis_code", "eunis_shares"]
+    assert compact["polygon_id"].to_list() == ["way/1"]

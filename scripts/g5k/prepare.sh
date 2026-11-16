@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
-# OAR job: build the evaluation pool and the EUNIS legend.
-# Usage: oarsub -n georeset-prepare -l /nodes=1/core=8,walltime=04:00:00 -t night \
-#          "bash scripts/g5k/prepare.sh <work_dir>"
+# OAR job step for building the evaluation pool in small pieces.
+# Usage:
+#   prepare.sh <work_dir> labels
+#   prepare.sh <work_dir> part <index> <parts>
+#   prepare.sh <work_dir> merge <parts>
+# Hugging Face downloads go to node-local /tmp so the home quota is not used.
 set -euo pipefail
 
-WORK="${1:?usage: prepare.sh <work_dir>}"
+WORK="${1:?usage: prepare.sh <work_dir> labels|part|merge ...}"
+STEP="${2:?usage: prepare.sh <work_dir> labels|part|merge ...}"
+export HF_HOME="/tmp/hf-georeset-${OAR_JOB_ID:-local}"
 cd "$HOME/GeoReSeT-Corpus-Assessment"
-.venv/bin/georeset prepare --work "$WORK"
+
+case "$STEP" in
+  labels) .venv/bin/georeset prepare-labels --work "$WORK" ;;
+  part)   .venv/bin/georeset prepare-part --work "$WORK" --part "${3:?part index}" --parts "${4:?parts}" ;;
+  merge)  .venv/bin/georeset prepare-merge --work "$WORK" --parts "${3:?parts}" ;;
+  *) echo "unknown step: $STEP" >&2; exit 2 ;;
+esac
+rm -rf "$HF_HOME"

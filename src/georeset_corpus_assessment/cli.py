@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import time
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
-from huggingface_hub import create_repo, snapshot_download, upload_folder
+from huggingface_hub import HfApi, create_repo, hf_hub_download, upload_folder
 
 from georeset_corpus_assessment import settings
 from georeset_corpus_assessment.engine import VllmEngine
@@ -18,7 +19,10 @@ from georeset_corpus_assessment.prepare import (
     LABEL_COLUMNS,
     SENTENCE_COLUMNS,
     build_pool,
+    compact_labels,
     legend_table_from_csv,
+    merge_pool_parts,
+    select_part,
     write_pool,
 )
 from georeset_corpus_assessment.sampling import round_robin
@@ -36,9 +40,21 @@ def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     parser = argparse.ArgumentParser(prog="georeset")
     commands = parser.add_subparsers(required=True)
 
-    prepare_cmd = commands.add_parser("prepare", help="Build the evaluation pool")
-    prepare_cmd.add_argument("--work", type=Path, required=True)
-    prepare_cmd.set_defaults(handler=_prepare)
+    labels_cmd = commands.add_parser("prepare-labels", help="Compact EUNIS labels")
+    labels_cmd.add_argument("--work", type=Path, required=True)
+    labels_cmd.set_defaults(handler=_prepare_labels)
+
+    part_cmd = commands.add_parser("prepare-part", help="Build one pool part")
+    part_cmd.add_argument("--work", type=Path, required=True)
+    part_cmd.add_argument("--part", type=int, required=True)
+    part_cmd.add_argument("--parts", type=int, required=True)
+    part_cmd.set_defaults(handler=_prepare_part)
+
+    merge_cmd = commands.add_parser("prepare-merge", help="Merge parts and legend")
+    merge_cmd.add_argument("--work", type=Path, required=True)
+    merge_cmd.add_argument("--parts", type=int, required=True)
+    merge_cmd.add_argument("--wait-minutes", type=int, default=45)
+    merge_cmd.set_defaults(handler=_prepare_merge)
 
     run_cmd = commands.add_parser("run", help="Label sentences with the model")
     run_cmd.add_argument("--work", type=Path, required=True)
@@ -59,24 +75,67 @@ def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     return parser
 
 
-def _prepare(args: argparse.Namespace) -> None:  # pragma: no cover
-    source = Path(
-        snapshot_download(
-            settings.SOURCE_DATASET,
-            repo_type="dataset",
-            revision=settings.SOURCE_DATASET_REVISION,
-            allow_patterns=["data/*/*/*.parquet", "polygons_labels_shares/*.parquet"],
-        ),
+def _source_files(prefix: str) -> list[str]:  # pragma: no cover
+    files = HfApi().list_repo_files(
+        settings.SOURCE_DATASET,
+        repo_type="dataset",
+        revision=settings.SOURCE_DATASET_REVISION,
     )
-    sentences = pl.read_parquet(
-        sorted((source / "data").glob("*/*/*.parquet")),
-        columns=SENTENCE_COLUMNS,
-    )
-    labels = pl.read_parquet(
-        sorted((source / "polygons_labels_shares").glob("*.parquet")),
-        columns=LABEL_COLUMNS,
-    )
-    write_pool(build_pool(sentences, labels), args.work)
+    return [
+        name for name in files if name.startswith(prefix) and name.endswith(".parquet")
+    ]
+
+
+def _download(names: list[str]) -> list[Path]:  # pragma: no cover
+    return [
+        Path(
+            hf_hub_download(
+                settings.SOURCE_DATASET,
+                filename=name,
+                repo_type="dataset",
+                revision=settings.SOURCE_DATASET_REVISION,
+            ),
+        )
+        for name in names
+    ]
+
+
+def _prepare_labels(args: argparse.Namespace) -> None:  # pragma: no cover
+    paths = _download(_source_files("polygons_labels_shares/"))
+    labels = pl.read_parquet(paths, columns=LABEL_COLUMNS)
+    args.work.mkdir(parents=True, exist_ok=True)
+    compact_labels(labels).write_parquet(args.work / "labels.parquet")
+
+
+def _prepare_part(args: argparse.Namespace) -> None:  # pragma: no cover
+    names = select_part(_source_files("data/"), args.part, args.parts)
+    sentences = pl.read_parquet(_download(names), columns=SENTENCE_COLUMNS)
+    labels = pl.read_parquet(args.work / "labels.parquet")
+    parts_dir = args.work / "parts"
+    parts_dir.mkdir(parents=True, exist_ok=True)
+    final = parts_dir / f"pool-{args.part:03d}.parquet"
+    temporary = final.with_suffix(".parquet.tmp")
+    build_pool(sentences, labels).write_parquet(temporary)
+    temporary.replace(final)
+
+
+def _wait_for_parts(
+    expected: list[Path], wait_minutes: int
+) -> None:  # pragma: no cover
+    deadline = time.monotonic() + wait_minutes * 60
+    while not all(path.exists() for path in expected):
+        if time.monotonic() > deadline:
+            msg = "pool parts are still missing; check the part jobs"
+            raise SystemExit(msg)
+        time.sleep(30)
+
+
+def _prepare_merge(args: argparse.Namespace) -> None:  # pragma: no cover
+    parts_dir = args.work / "parts"
+    expected = [parts_dir / f"pool-{index:03d}.parquet" for index in range(args.parts)]
+    _wait_for_parts(expected, args.wait_minutes)
+    pool = merge_pool_parts([pl.read_parquet(path) for path in expected])
+    write_pool(pool, args.work)
     legend_csv = args.work / "eunis_legend_detailed.csv"
     urllib.request.urlretrieve(settings.LEGEND_URL, legend_csv)  # noqa: S310
     legend_table_from_csv(legend_csv).write_parquet(args.work / "legend.parquet")
