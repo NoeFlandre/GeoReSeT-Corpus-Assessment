@@ -71,7 +71,7 @@ class TransformersEngine:  # pragma: no cover
         return [
             Generation(
                 text=text,
-                finish_reason=_finish_reason(
+                finish_reason=finish_reason(
                     tokens, self._max_new_tokens, self._tokenizer.eos_token_id
                 ),
             )
@@ -79,7 +79,8 @@ class TransformersEngine:  # pragma: no cover
         ]
 
 
-def _finish_reason(tokens: list[int], limit: int, eos_token_id: int | None) -> str:
+def finish_reason(tokens: list[int], limit: int, eos_token_id: int | None) -> str:
+    """Return "stop" when the model ended, or "length" when it hit the limit."""
     if eos_token_id is not None and eos_token_id in tokens:
         return "stop"
     return "length" if len(tokens) >= limit else "stop"
