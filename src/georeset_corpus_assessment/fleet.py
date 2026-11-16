@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 CAP_PER_SITE = 24
 CAP_TOTAL = 60
 WAIT_LIMIT = timedelta(minutes=9)
-MAX_WALLTIME_MIN = 60
+MAX_WALLTIME_MIN = 30
 MARGIN_MIN = 2
 LOAD_MIN = 4
 MIN_USEFUL_MIN = 15

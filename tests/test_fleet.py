@@ -40,7 +40,7 @@ def test_window_end_is_19h_in_daytime_and_9h_at_night() -> None:
 
 
 def test_walltime_is_capped_at_an_hour_and_none_when_too_short() -> None:
-    assert walltime_minutes(MONDAY_2300) == 60
+    assert walltime_minutes(MONDAY_2300) == 30
     assert walltime_minutes(datetime(2026, 11, 16, 18, 50)) is None  # noqa: DTZ001
     assert walltime_minutes(datetime(2026, 11, 16, 18, 30)) == 28  # noqa: DTZ001
 
