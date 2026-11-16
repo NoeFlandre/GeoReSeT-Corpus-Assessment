@@ -71,6 +71,17 @@ def next_batch(
     return pending.head(batch_size)
 
 
+def shard_subset(
+    order: pl.DataFrame, limit: int, shard: int, shards: int
+) -> pl.DataFrame:
+    """Return the rows of the first ``limit`` positions that belong to one shard."""
+    if not 0 <= shard < shards:
+        msg = "shard must satisfy 0 <= shard < shards"
+        raise ValueError(msg)
+    head = order.head(limit)
+    return head.filter(pl.col("position") % shards == shard)
+
+
 def interpret(generation: Generation, valid: frozenset[str]) -> Prediction:
     """Turn a generation into a prediction, treating truncation as an error."""
     if generation.finish_reason == TRUNCATED:
@@ -158,7 +169,7 @@ def run(  # noqa: PLR0913
 
 def score_results(output_dir: Path, legend: Legend) -> pl.DataFrame:
     """Score every shard at each EUNIS level and return one row per level."""
-    results = pl.read_parquet(sorted(output_dir.glob(SHARD_PATTERN)))
+    results = pl.read_parquet(sorted(output_dir.rglob(SHARD_PATTERN)))
     gold = [
         frozenset(identifiers) for identifiers in results["gold_identifiers"].to_list()
     ]

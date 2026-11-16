@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import polars as pl
+import pytest
 
 from georeset_corpus_assessment.legend import Legend
 from georeset_corpus_assessment.pipeline import (
@@ -13,6 +14,7 @@ from georeset_corpus_assessment.pipeline import (
     next_batch,
     run,
     score_results,
+    shard_subset,
     write_shard,
 )
 
@@ -185,3 +187,17 @@ def test_score_results_reports_each_level(tmp_path: Path, legend: Legend) -> Non
     assert metrics["level"].to_list() == [1, 2, 3]
     assert metrics["sentences"].to_list() == [3, 3, 3]
     assert metrics.filter(pl.col("level") == 3)["micro_f1"].to_list() == [1.0]
+
+
+def test_shard_subsets_cover_the_limit_without_overlap() -> None:
+    order = make_order(10)
+    seen = []
+    for shard in range(3):
+        subset = shard_subset(order, limit=7, shard=shard, shards=3)
+        seen.extend(subset["id"].to_list())
+    assert sorted(seen) == [f"s{index}" for index in range(7)]
+
+
+def test_shard_subset_rejects_an_out_of_range_shard() -> None:
+    with pytest.raises(ValueError, match="shard must satisfy"):
+        shard_subset(make_order(3), limit=3, shard=3, shards=3)

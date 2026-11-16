@@ -14,7 +14,12 @@ from huggingface_hub import HfApi, create_repo, hf_hub_download, upload_folder
 from georeset_corpus_assessment import settings
 from georeset_corpus_assessment.engine import VllmEngine
 from georeset_corpus_assessment.legend import load_legend
-from georeset_corpus_assessment.pipeline import RunConfig, run, score_results
+from georeset_corpus_assessment.pipeline import (
+    RunConfig,
+    run,
+    score_results,
+    shard_subset,
+)
 from georeset_corpus_assessment.prepare import (
     LABEL_COLUMNS,
     SENTENCE_COLUMNS,
@@ -62,6 +67,8 @@ def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     run_cmd.add_argument("--limit", type=int, required=True)
     run_cmd.add_argument("--batch-size", type=int, default=500)
     run_cmd.add_argument("--gpu", default="unknown")
+    run_cmd.add_argument("--shard", type=int, default=0)
+    run_cmd.add_argument("--shards", type=int, default=1)
     run_cmd.set_defaults(handler=_run)
 
     score_cmd = commands.add_parser("score", help="Score a results folder per level")
@@ -145,8 +152,10 @@ def _run(args: argparse.Namespace) -> None:  # pragma: no cover
     pool = pl.read_parquet(args.work / "pool.parquet")
     legend = load_legend(pl.read_parquet(args.work / "legend.parquet"))
     order = round_robin(pool, settings.SEED)
-    args.out.mkdir(parents=True, exist_ok=True)
-    order.write_parquet(args.out / "manifest.parquet")
+    subset = shard_subset(order, args.limit, args.shard, args.shards)
+    out_dir = args.out / f"shard-{args.shard:02d}"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    subset.write_parquet(out_dir / "manifest.parquet")
     config = RunConfig(
         model_id=settings.MODEL_ID,
         model_revision=settings.MODEL_REVISION,
@@ -160,16 +169,16 @@ def _run(args: argparse.Namespace) -> None:  # pragma: no cover
         settings.MAX_NEW_TOKENS,
     )
     written = run(
-        order,
+        subset,
         legend,
         engine,
-        args.out,
+        out_dir,
         config,
-        limit=args.limit,
+        limit=subset.height,
         batch_size=args.batch_size,
         created_at=datetime.now(tz=UTC).isoformat(),
     )
-    print(f"wrote {written} rows to {args.out}")  # noqa: T201
+    print(f"wrote {written} rows to {out_dir}")  # noqa: T201
 
 
 def _score(args: argparse.Namespace) -> None:  # pragma: no cover
