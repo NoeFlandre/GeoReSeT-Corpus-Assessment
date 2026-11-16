@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from pathlib import Path
 
 import polars as pl
@@ -7,7 +6,6 @@ import pytest
 from georeset_corpus_assessment.legend import Legend
 from georeset_corpus_assessment.pipeline import (
     Generation,
-    RunConfig,
     build_rows,
     done_ids,
     interpret,
@@ -17,40 +15,7 @@ from georeset_corpus_assessment.pipeline import (
     shard_subset,
     write_shard,
 )
-
-CONFIG = RunConfig(
-    model_id="model",
-    model_revision="rev",
-    dataset_revision="data",
-    seed=1,
-    gpu="T4",
-)
-
-
-class FakeEngine:
-    def __init__(self, text: str) -> None:
-        self.text = text
-        self.calls = 0
-
-    def generate(self, prompts: Sequence[list[dict[str, str]]]) -> list[Generation]:
-        self.calls += 1
-        return [Generation(text=self.text, finish_reason="stop") for _ in prompts]
-
-
-def make_order(count: int) -> pl.DataFrame:
-    return pl.DataFrame(
-        {
-            "id": [f"s{index}" for index in range(count)],
-            "text": [f"sentence {index}" for index in range(count)],
-            "region": ["r"] * count,
-            "polygon_id": [f"way/{index}" for index in range(count)],
-            "cell": ["c"] * count,
-            "gold_codes": [[1101]] * count,
-            "round": list(range(count)),
-            "position": list(range(count)),
-        },
-        schema_overrides={"gold_codes": pl.List(pl.Int64)},
-    )
+from support import CONFIG, FakeEngine, make_order
 
 
 def test_done_ids_is_empty_without_shards(tmp_path: Path) -> None:
@@ -92,7 +57,7 @@ def test_build_rows_records_gold_prediction_and_run_metadata(legend: Legend) -> 
     assert row["gold_identifiers"] == ["MA211"]
     assert row["predicted"] == ["MA211"]
     assert row["parse_error"] == ""
-    assert row["gpu"] == "T4"
+    assert row["gpu"] == "A100"
     assert row["model_revision"] == "rev"
 
 

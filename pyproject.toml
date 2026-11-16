@@ -59,7 +59,7 @@ max-complexity = 5
 
 [tool.ty.environment]
 python-version = "3.12"
-extra-paths = ["scripts"]
+extra-paths = ["scripts", "tests"]
 
 # --- Dead code (YAGNI) ------------------------------------------------------
 

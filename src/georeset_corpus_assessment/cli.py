@@ -31,6 +31,7 @@ from georeset_corpus_assessment.prepare import (
     write_pool,
 )
 from georeset_corpus_assessment.sampling import round_robin
+from georeset_corpus_assessment.worker import reclaim, work
 
 
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover
@@ -75,6 +76,23 @@ def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     score_cmd.add_argument("--work", type=Path, required=True)
     score_cmd.add_argument("--out", type=Path, required=True)
     score_cmd.set_defaults(handler=_score)
+
+    work_cmd = commands.add_parser("work", help="Claim and run shards from the queue")
+    work_cmd.add_argument("--work", type=Path, required=True)
+    work_cmd.add_argument("--out", type=Path, required=True)
+    work_cmd.add_argument("--limit", type=int, required=True)
+    work_cmd.add_argument("--shards", type=int, required=True)
+    work_cmd.add_argument("--budget-minutes", type=float, required=True)
+    work_cmd.add_argument("--estimate-minutes", type=float, default=8.0)
+    work_cmd.add_argument("--gpu", default="unknown")
+    work_cmd.set_defaults(handler=_work)
+
+    reclaim_cmd = commands.add_parser(
+        "reclaim", help="Free claims of unfinished shards"
+    )
+    reclaim_cmd.add_argument("--out", type=Path, required=True)
+    reclaim_cmd.add_argument("--shards", type=int, required=True)
+    reclaim_cmd.set_defaults(handler=_reclaim)
 
     publish_cmd = commands.add_parser("publish", help="Upload Parquet files to HF")
     publish_cmd.add_argument("--out", type=Path, required=True)
@@ -181,6 +199,43 @@ def _run(args: argparse.Namespace) -> None:  # pragma: no cover
     print(f"wrote {written} rows to {out_dir}")  # noqa: T201
 
 
+def _work(args: argparse.Namespace) -> None:  # pragma: no cover
+    pool = pl.read_parquet(args.work / "pool.parquet")
+    legend = load_legend(pl.read_parquet(args.work / "legend.parquet"))
+    order = round_robin(pool, settings.SEED)
+    config = RunConfig(
+        model_id=settings.MODEL_ID,
+        model_revision=settings.MODEL_REVISION,
+        dataset_revision=settings.SOURCE_DATASET_REVISION,
+        seed=settings.SEED,
+        gpu=args.gpu,
+    )
+    engine = TransformersEngine(
+        settings.MODEL_ID,
+        settings.MODEL_REVISION,
+        settings.MAX_NEW_TOKENS,
+    )
+    finished = work(
+        order,
+        legend,
+        engine,
+        args.out,
+        config,
+        limit=args.limit,
+        shards=args.shards,
+        budget_seconds=args.budget_minutes * 60,
+        estimate_seconds=args.estimate_minutes * 60,
+        clock=time.monotonic,
+        created_at=datetime.now(tz=UTC).isoformat(),
+    )
+    print(f"finished shards: {finished}")  # noqa: T201
+
+
+def _reclaim(args: argparse.Namespace) -> None:  # pragma: no cover
+    freed = reclaim(args.out, args.shards)
+    print(f"freed claims: {freed}")  # noqa: T201
+
+
 def _score(args: argparse.Namespace) -> None:  # pragma: no cover
     legend = load_legend(pl.read_parquet(args.work / "legend.parquet"))
     metrics = score_results(args.out, legend)
@@ -192,7 +247,8 @@ def _publish(args: argparse.Namespace) -> None:  # pragma: no cover
     create_repo(settings.RESULTS_DATASET, repo_type="dataset", exist_ok=True)
     upload_folder(
         folder_path=args.out,
+        path_in_repo=args.out.name,
         repo_id=settings.RESULTS_DATASET,
         repo_type="dataset",
-        allow_patterns=["*.parquet"],
+        allow_patterns=["*.parquet", "*/*.parquet"],
     )
