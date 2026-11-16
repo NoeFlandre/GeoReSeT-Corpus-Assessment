@@ -13,8 +13,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-CAP_PER_SITE = 24
-CAP_TOTAL = 60
+CAP_PER_SITE = 36
+CAP_TOTAL = 100
 WAIT_LIMIT = timedelta(minutes=9)
 MAX_WALLTIME_MIN = 30
 MARGIN_MIN = 2

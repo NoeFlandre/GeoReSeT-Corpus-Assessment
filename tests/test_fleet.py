@@ -69,7 +69,7 @@ def test_plan_respects_site_and_total_caps() -> None:
         {"lille": 30, "nantes": 30},
         Health(),
     )
-    assert result.submit == {"lille": 2, "nantes": 0}
+    assert result.submit == {"lille": 8, "nantes": 0}
 
 
 def test_plan_submits_nothing_when_the_window_is_too_short() -> None:
@@ -133,7 +133,7 @@ def test_render_actions_skips_submit_when_no_window_or_nothing_to_submit() -> No
 def test_plan_counts_jobs_elsewhere_against_the_total_cap() -> None:
     jobs = [Job(i, "R", MONDAY_1000) for i in range(2)]
     result = plan({"lille": jobs}, MONDAY_1000, {"lille": 20}, Health(), elsewhere=57)
-    assert result.submit == {"lille": 1}
+    assert result.submit == {"lille": 18}
 
 
 def test_apply_outcomes_records_successes_too() -> None:
