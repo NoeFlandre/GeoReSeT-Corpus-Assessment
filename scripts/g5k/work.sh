@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# OAR worker job: claim and run shards from this site's queue within a time budget.
+# OAR worker job: run several worker processes on one GPU. Each process claims shards
+# from this site's queue, so the processes share the work without duplicates.
 # Usage: work.sh <work_dir> <out_dir> <limit> <shards> <budget_min> <owner> <owners> [estimate_min]
 set -euo pipefail
 
@@ -14,6 +15,13 @@ EST="${8:-8}"
 
 cd "$HOME/GeoReSeT-Corpus-Assessment"
 GPU="$(nvidia-smi --query-gpu=name --format=csv,noheader | head -n 1)"
-.venv/bin/georeset work --work "$WORK" --out "$OUT" --limit "$LIMIT" \
-  --shards "$SHARDS" --budget-minutes "$BUDGET" --estimate-minutes "$EST" \
-  --gpu "$GPU" --owner "$OWNER" --owners "$OWNERS"
+MEM_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -n 1)"
+if [ "$MEM_MIB" -ge 70000 ]; then PROCS=3; else PROCS=2; fi
+
+for _ in $(seq "$PROCS"); do
+  .venv/bin/georeset work --work "$WORK" --out "$OUT" --limit "$LIMIT" \
+    --shards "$SHARDS" --budget-minutes "$BUDGET" --estimate-minutes "$EST" \
+    --gpu "$GPU" --owner "$OWNER" --owners "$OWNERS" &
+  sleep 20
+done
+wait

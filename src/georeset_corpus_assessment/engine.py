@@ -9,7 +9,7 @@ from georeset_corpus_assessment.pipeline import Generation
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-MICRO_BATCH = 32
+MICRO_BATCH = 64
 
 
 class TransformersEngine:  # pragma: no cover
