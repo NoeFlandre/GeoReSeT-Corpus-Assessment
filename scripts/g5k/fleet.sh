@@ -21,6 +21,31 @@ SHARDS=200
 mkdir -p "$STATE"
 cd "$HOME/GeoReSeT-Corpus-Assessment"
 
+# Besteffort workers (9th argument). They count inside the site target, so the python
+# plan below sees them as active jobs. Skipped when a 30-minute job would cross 09:00 or 19:00.
+BE_WANT="${9:-0}"
+if [ "$BE_WANT" -gt 0 ]; then
+  dow=$(date +%u)
+  nm=$((10#$(date +%H) * 60 + 10#$(date +%M)))
+  if [ "$dow" -le 5 ] && [ "$nm" -ge 540 ] && [ "$nm" -lt 1140 ]; then left=$((1140 - nm))
+  elif [ "$nm" -lt 540 ]; then left=$((540 - nm))
+  else left=9999; fi
+  BE_ACTIVE=$(oarstat -u nflandre -f 2>/dev/null | grep -c "name = georeset-be-$SITE" || true)
+  BE_NEW=$((BE_WANT - BE_ACTIVE))
+  if [ "$left" -lt 32 ]; then BE_NEW=0; fi
+  if [ "$BE_NEW" -gt 0 ]; then
+    for _ in $(seq "$BE_NEW"); do
+      if [ "$SITE" = "lille" ]; then
+        oarsub -q default -t besteffort -n "georeset-be-$SITE" -p "gpu_model = 'A100-SXM4-40GB'" \
+          -l "gpu=1,walltime=00:30:00" "bash scripts/g5k/work.sh $HOME/georeset-work $HOME/georeset-results-10k 10000 200 24 $OWNER $OWNERS" > /dev/null 2>&1 || true
+      else
+        oarsub -q default -t besteffort -t exotic -n "georeset-be-$SITE" \
+          -l "gpu=1,walltime=00:30:00" "bash scripts/g5k/work.sh $HOME/georeset-work $HOME/georeset-results-10k 10000 200 24 $OWNER $OWNERS" > /dev/null 2>&1 || true
+      fi
+    done
+  fi
+fi
+
 oarstat -u nflandre -f > "$STATE/jobs-$SITE.txt" 2>/dev/null || true
 FLAG=""
 [ "$RUNNING" = "1" ] && FLAG="--running"
