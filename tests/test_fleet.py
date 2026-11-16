@@ -66,7 +66,7 @@ def test_plan_respects_site_and_total_caps() -> None:
     result = plan(
         {"lille": lille, "nantes": nantes},
         MONDAY_1000,
-        {"lille": 10, "nantes": 10},
+        {"lille": 30, "nantes": 30},
         Health(),
     )
     assert result.submit == {"lille": 2, "nantes": 0}
@@ -146,3 +146,9 @@ def test_long_state_names_from_full_oarstat_count_as_waiting() -> None:
     old = Job(5, "Waiting", MONDAY_1800 - timedelta(minutes=20))
     result = plan({"lille": [old]}, MONDAY_1800, {}, Health())
     assert result.cancel == {"lille": [5]}
+
+
+def test_want_is_a_target_not_an_increment() -> None:
+    jobs = [Job(i, "W", MONDAY_1000) for i in range(6)]
+    result = plan({"nantes": jobs}, MONDAY_1000, {"nantes": 6}, Health())
+    assert result.submit == {"nantes": 0}

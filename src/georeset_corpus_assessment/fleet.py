@@ -140,7 +140,7 @@ def _submissions(
         count = 0
         if site in usable:
             room = min(CAP_PER_SITE - active.get(site, 0), CAP_TOTAL - total)
-            count = max(0, min(wanted, room))
+            count = max(0, min(wanted - active.get(site, 0), room))
         submit[site] = count
         total += count
     return submit
