@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+
+# Tooling caches and reports
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ty_cache/
+.pylint.d/
+.coverage
+.coverage.*
+htmlcov/
+coverage.json
+mutants/
+.mutmut-cache
+
+# Docs build output
+site/

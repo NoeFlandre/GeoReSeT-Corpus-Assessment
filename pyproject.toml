@@ -1,0 +1,93 @@
+[project]
+name = "georeset-corpus-assessment"
+version = "0.1.0"
+description = "Corpus assessment tooling for the GeoReSeT project"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.17.3",
+    "mkdocs-material>=9.8.1",
+    "mutmut>=3.8.1",
+    "pylint>=4.1.4",
+    "pytest>=9.2.0",
+    "radon>=6.0.1",
+    "ruff>=0.17.5",
+    "ty>=0.0.104",
+    "vulture>=2.16",
+]
+
+# --- Formatting and linting -------------------------------------------------
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # conflicts with the formatter
+    "CPY001", # the project does not use copyright headers
+    "D203",   # conflicts with D211
+    "D213",   # conflicts with D212
+    "ISC001", # conflicts with the formatter
+]
+
+[tool.ruff.lint.mccabe]
+# A function with complexity above 5 cannot stay below CRAP 6 even at 100% coverage.
+max-complexity = 5
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "PLR2004", "S101"]
+"scripts/**" = ["T201"]
+
+# --- Type checking ----------------------------------------------------------
+
+[tool.ty.environment]
+python-version = "3.12"
+extra-paths = ["scripts"]
+
+# --- Dead code (YAGNI) ------------------------------------------------------
+
+[tool.vulture]
+paths = ["src", "tests", "scripts"]
+min_confidence = 60
+
+# --- Duplicate code (DRY) ---------------------------------------------------
+
+[tool.pylint.similarities]
+min-similarity-lines = 4
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+ignore-signatures = true
+
+# --- Tests and coverage -----------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["scripts"]
+
+[tool.coverage.run]
+source = ["src", "scripts"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = false
+exclude_also = ['if __name__ == "__main__":']
+
+# --- Mutation testing -------------------------------------------------------
+
+[tool.mutmut]
+source_paths = ["src/"]
+pytest_add_cli_args_test_selection = ["tests/"]
+also_copy = ["scripts/"]

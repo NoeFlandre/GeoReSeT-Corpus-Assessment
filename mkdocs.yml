@@ -1,0 +1,15 @@
+site_name: GeoReSeT Corpus Assessment
+site_description: Corpus assessment tooling for the GeoReSeT project
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Code quality: code-quality.md
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+strict: true
