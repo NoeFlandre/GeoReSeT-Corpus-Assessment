@@ -46,9 +46,13 @@ def try_claim(out: Path, shard: int) -> bool:
     return True
 
 
-def next_shard(out: Path, shards: int) -> int | None:
-    """Claim the lowest unfinished, unclaimed shard, or return None."""
-    for shard in range(shards):
+def next_shard(out: Path, shards: int, owner: int = 0, owners: int = 1) -> int | None:
+    """Claim the lowest unfinished, unclaimed shard this owner is responsible for.
+
+    Sites split the shard indices between them: owner ``i`` of ``owners`` takes
+    the shards whose index is congruent to ``i`` modulo ``owners``.
+    """
+    for shard in range(owner, shards, owners):
         if not is_done(out, shard) and try_claim(out, shard):
             return shard
     return None
@@ -78,12 +82,14 @@ def work(  # noqa: PLR0913
     estimate_seconds: float,
     clock: Callable[[], float],
     created_at: str,
+    owner: int = 0,
+    owners: int = 1,
 ) -> list[int]:
     """Process shards until none are left or the budget cannot fit another one."""
     deadline = clock() + budget_seconds
     finished: list[int] = []
     while clock() + estimate_seconds <= deadline:
-        shard = next_shard(out, shards)
+        shard = next_shard(out, shards, owner, owners)
         if shard is None:
             break
         subset = shard_subset(order, limit, shard, shards)

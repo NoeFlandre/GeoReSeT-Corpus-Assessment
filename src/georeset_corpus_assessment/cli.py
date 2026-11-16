@@ -13,6 +13,14 @@ from huggingface_hub import HfApi, create_repo, hf_hub_download, upload_folder
 
 from georeset_corpus_assessment import settings
 from georeset_corpus_assessment.engine import TransformersEngine
+from georeset_corpus_assessment.fleet import (
+    apply_outcomes,
+    dump_health,
+    load_health,
+    parse_oarstat_full,
+    plan,
+    render_actions,
+)
 from georeset_corpus_assessment.legend import load_legend
 from georeset_corpus_assessment.pipeline import (
     RunConfig,
@@ -42,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:  # pragma: no cover
     return 0
 
 
-def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
+def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover  # noqa: PLR0915
     parser = argparse.ArgumentParser(prog="georeset")
     commands = parser.add_subparsers(required=True)
 
@@ -85,6 +93,8 @@ def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     work_cmd.add_argument("--budget-minutes", type=float, required=True)
     work_cmd.add_argument("--estimate-minutes", type=float, default=8.0)
     work_cmd.add_argument("--gpu", default="unknown")
+    work_cmd.add_argument("--owner", type=int, default=0)
+    work_cmd.add_argument("--owners", type=int, default=1)
     work_cmd.set_defaults(handler=_work)
 
     reclaim_cmd = commands.add_parser(
@@ -93,6 +103,18 @@ def _build_parser() -> argparse.ArgumentParser:  # pragma: no cover
     reclaim_cmd.add_argument("--out", type=Path, required=True)
     reclaim_cmd.add_argument("--shards", type=int, required=True)
     reclaim_cmd.set_defaults(handler=_reclaim)
+
+    fleet_cmd = commands.add_parser("fleet", help="Print cancels and submissions")
+    fleet_cmd.add_argument("--site", required=True)
+    fleet_cmd.add_argument("--jobs", type=Path, required=True)
+    fleet_cmd.add_argument("--want", type=int, required=True)
+    fleet_cmd.add_argument("--health", type=Path, required=True)
+    fleet_cmd.add_argument("--now", required=True)
+    fleet_cmd.add_argument("--elsewhere", type=int, default=0)
+    fleet_cmd.add_argument("--failures", type=int, default=0)
+    fleet_cmd.add_argument("--successes", type=int, default=0)
+    fleet_cmd.add_argument("--running", action="store_true")
+    fleet_cmd.set_defaults(handler=_fleet)
 
     publish_cmd = commands.add_parser("publish", help="Upload Parquet files to HF")
     publish_cmd.add_argument("--out", type=Path, required=True)
@@ -227,6 +249,8 @@ def _work(args: argparse.Namespace) -> None:  # pragma: no cover
         estimate_seconds=args.estimate_minutes * 60,
         clock=time.monotonic,
         created_at=datetime.now(tz=UTC).isoformat(),
+        owner=args.owner,
+        owners=args.owners,
     )
     print(f"finished shards: {finished}")  # noqa: T201
 
@@ -234,6 +258,28 @@ def _work(args: argparse.Namespace) -> None:  # pragma: no cover
 def _reclaim(args: argparse.Namespace) -> None:  # pragma: no cover
     freed = reclaim(args.out, args.shards)
     print(f"freed claims: {freed}")  # noqa: T201
+
+
+def _fleet(args: argparse.Namespace) -> None:  # pragma: no cover
+    health = load_health(args.health.read_text() if args.health.exists() else "")
+    apply_outcomes(
+        health,
+        args.site,
+        failures=args.failures,
+        successes=args.successes,
+        running=args.running,
+    )
+    jobs = parse_oarstat_full(args.jobs.read_text())
+    decision = plan(
+        {args.site: jobs},
+        datetime.fromisoformat(args.now),
+        {args.site: args.want},
+        health,
+        elsewhere=args.elsewhere,
+    )
+    args.health.write_text(dump_health(health))
+    for line in render_actions(decision, args.site):
+        print(line)  # noqa: T201
 
 
 def _score(args: argparse.Namespace) -> None:  # pragma: no cover

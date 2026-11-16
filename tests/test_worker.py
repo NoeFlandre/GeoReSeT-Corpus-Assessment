@@ -70,3 +70,10 @@ def test_work_stops_before_a_shard_that_cannot_fit_the_budget(
         created_at="t",
     )
     assert finished == []
+
+
+def test_owners_take_disjoint_shards(tmp_path: Path) -> None:
+    claimed = {next_shard(tmp_path, 6, owner=0, owners=2) for _ in range(3)}
+    other = {next_shard(tmp_path, 6, owner=1, owners=2) for _ in range(3)}
+    assert claimed == {0, 2, 4}
+    assert other == {1, 3, 5}
