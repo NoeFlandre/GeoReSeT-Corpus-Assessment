@@ -10,4 +10,4 @@ def test_settings_pin_the_model_and_dataset() -> None:
 
 def test_adapters_import_without_gpu_dependencies() -> None:
     assert callable(cli.main)
-    assert engine.VllmEngine.__name__ == "VllmEngine"
+    assert engine.TransformersEngine.__name__ == "TransformersEngine"
