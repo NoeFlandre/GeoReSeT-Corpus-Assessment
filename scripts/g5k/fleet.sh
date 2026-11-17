@@ -39,7 +39,7 @@ if [ "$BE_WANT" -gt 0 ]; then
         oarsub -q default -t besteffort -n "georeset-be-$SITE" -p "gpu_model = 'A100-SXM4-40GB'" \
           -l "gpu=1,walltime=00:30:00" "bash scripts/g5k/work.sh $HOME/georeset-work $HOME/georeset-results-10k 10000 200 24 $OWNER $OWNERS" > /dev/null 2>&1 || true
       else
-        oarsub -q default -t besteffort -t exotic -n "georeset-be-$SITE" \
+        oarsub -q default -t besteffort -t exotic -n "georeset-be-$SITE" -p "gpu_model = 'A100-SXM4-40GB'" \
           -l "gpu=1,walltime=00:30:00" "bash scripts/g5k/work.sh $HOME/georeset-work $HOME/georeset-results-10k 10000 200 24 $OWNER $OWNERS" > /dev/null 2>&1 || true
       fi
     done
@@ -65,6 +65,10 @@ while read -r kind a b c; do
       for _ in $(seq "$a"); do
         if [ "$SITE" = "lille" ]; then
           oarsub -q default -n "georeset-w-$SITE" -p "gpu_model = 'A100-SXM4-40GB'" \
+            -l "gpu=1,walltime=$WALL" \
+            "bash scripts/g5k/work.sh $WORK $OUT $LIMIT $SHARDS $c $OWNER $OWNERS" > /dev/null
+        elif [ "$SITE" = "lyon" ]; then
+          oarsub -q default -t exotic -n "georeset-w-$SITE" -p "gpu_model = 'A100-SXM4-40GB'" \
             -l "gpu=1,walltime=$WALL" \
             "bash scripts/g5k/work.sh $WORK $OUT $LIMIT $SHARDS $c $OWNER $OWNERS" > /dev/null
         else
